@@ -1,9 +1,10 @@
+import sqlite3
+import re
+
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_session import Session
 from passlib.hash import sha256_crypt
 from tempfile import gettempdir
-import sqlite3
-import re
 
 from helpers import *
 
@@ -100,7 +101,15 @@ def logout():
 @login_required
 def quote():
     """Get stock quote."""
-    return apology("TODO")
+    if request.method == "GET":
+        return render_template("quote.html")
+    elif request.method == "POST":
+        if not request.form.get("stock-symbol"):
+            return apology("Error", "Forgot to enter a stock")
+        stock = lookup(request.form.get("stock-symbol"))
+        return render_template("quoted.html", stock=stock)
+    else:
+        return apology("TODO")
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -120,27 +129,37 @@ def register():
             return apology("Error", "Forgot Password")
         elif not request.form.get("password-confirm"):
             return apology("Error", "Forgot Confirmation")
+        # TODO consider rejecting non alpha numeric symbols
+        # remove non alpha numberic symbols
+        username = re.sub(r'\W+', '', request.form.get("username").lower())
+        password = request.form.get("password")
+        password_confirm = request.form.get("password-confirm")
+
+        # if passwords match
+        if password == password_confirm:
+            # encrypt password
+            hashed = sha256_crypt.encrypt(password)
+
+            # if username is original
+            try:
+
+                # send user details to database
+                c.execute("INSERT INTO users(username, hash) VALUES(:username, :hash)", [username, hashed])
+                db.commit()
+
+                # immediately log user in
+                c.execute("SELECT * FROM users WHERE username = :username", [username])
+                user = c.fetchall()
+                session["user_id"] = user[0][0]
+
+                # send user to index
+                return redirect(url_for("index"))
+
+            # if username is not unique alert user
+            except sqlite3.IntegrityError:
+                return apology("Error", "Username taken")
         else:
-
-            # TODO consider rejecting non alpha numeric symbols
-            # remove non alpha numberic symbols
-            username = re.sub(r'\W+', '', request.form.get("username").lower())
-            password = request.form.get("password")
-            password_confirm = request.form.get("password-confirm")
-
-            # if passwords match
-            if password == password_confirm:
-                # encrypt password
-                hashed = sha256_crypt.encrypt(password)
-
-                # if username is original insert user to finance.db else show error
-                try:
-                    c.execute("INSERT INTO users(username, hash) VALUES(:username, :hash)", [username, hashed])
-                    db.commit()
-                except sqlite3.IntegrityError:
-                    return apology("Error", "Username taken")
-            else:
-                return apology("Passwords don't match")
+            return apology("Passwords don't match")
 
 @app.route("/sell", methods=["GET", "POST"])
 @login_required
