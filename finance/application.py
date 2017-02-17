@@ -3,6 +3,7 @@ from flask_session import Session
 from passlib.hash import sha256_crypt
 from tempfile import gettempdir
 import sqlite3
+import re
 
 from helpers import *
 
@@ -27,8 +28,10 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-# configure CS50 Library to use SQLite database
-db = sqlite3.connect("finance.db")
+# connect sqlite3 with database
+file = "finance.db"
+db = sqlite3.connect(file, check_same_thread=False)
+c = db.cursor()
 
 @app.route("/")
 @login_required
@@ -66,14 +69,15 @@ def login():
             return apology("must provide password")
 
         # query database for username
-        rows = db.execute("SELECT * FROM users WHERE username = :username", username=request.form.get("username"))
-
+        c.execute("SELECT * FROM users WHERE username = :username", [request.form.get("username").lower()])
+        all_rows = c.fetchall()
+        print(all_rows[0])
         # ensure username exists and password is correct
-        if len(rows) != 1 or not sha256_crypt.verify(request.form.get("password"), rows[0]["hash"]):
+        if len(all_rows) != 1 or not sha256_crypt.verify(request.form.get("password"), all_rows[0][2]):
             return apology("invalid username and/or password")
 
         # remember which user has logged in
-        session["user_id"] = rows[0]["id"]
+        session["user_id"] = all_rows[0][0]
 
         # redirect user to home page
         return redirect(url_for("index"))
@@ -105,10 +109,10 @@ def register():
     if request.method == "GET":
         return render_template("register.html")
     elif request.method == "POST":
-        userName = request.form.get("username")
+        username = re.sub(r'\W+', '', request.form.get("username").lower())
         password = request.form.get("password")
         passwordConfirm = request.form.get("password-confirm")
-        if not userName:
+        if not username:
             return apology("Error","Forgot Username")
         elif not password:
             return apology("Error", "Forgot Password")
@@ -116,8 +120,14 @@ def register():
             return apology("Error", "Forgot Confirmation")
         else:
             if password == passwordConfirm:
-                password = sha256_crypt.encrypt(password)
-            else: return apology("Passwords don't match")
+                hashed = sha256_crypt.encrypt(password)
+                try:
+                    result = c.execute("INSERT INTO users(username, hash) VALUES(:username, :hash)", [username, hashed])
+                    c.commit()
+                except sqlite3.IntegrityError:
+                    return apology("Error", "Username taken")
+            else:
+                return apology("Passwords don't match")
         return render_template("login.html")
     # return apology("TODO")
 
