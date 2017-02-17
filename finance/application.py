@@ -71,7 +71,7 @@ def login():
         # query database for username
         c.execute("SELECT * FROM users WHERE username = :username", [request.form.get("username").lower()])
         all_rows = c.fetchall()
-        print(all_rows[0])
+
         # ensure username exists and password is correct
         if len(all_rows) != 1 or not sha256_crypt.verify(request.form.get("password"), all_rows[0][2]):
             return apology("invalid username and/or password")
@@ -106,30 +106,41 @@ def quote():
 def register():
     """Register user."""
 
+    # if get request return register template
     if request.method == "GET":
         return render_template("register.html")
+
+    # if post request
     elif request.method == "POST":
-        username = re.sub(r'\W+', '', request.form.get("username").lower())
-        password = request.form.get("password")
-        passwordConfirm = request.form.get("password-confirm")
-        if not username:
+
+        # check fields for completion
+        if not request.form.get("username"):
             return apology("Error","Forgot Username")
-        elif not password:
+        elif not request.form.get("password"):
             return apology("Error", "Forgot Password")
-        elif not passwordConfirm:
+        elif not request.form.get("password-confirm"):
             return apology("Error", "Forgot Confirmation")
         else:
-            if password == passwordConfirm:
+
+            # TODO consider rejecting non alpha numeric symbols
+            # remove non alpha numberic symbols
+            username = re.sub(r'\W+', '', request.form.get("username").lower())
+            password = request.form.get("password")
+            password_confirm = request.form.get("password-confirm")
+
+            # if passwords match
+            if password == password_confirm:
+                # encrypt password
                 hashed = sha256_crypt.encrypt(password)
+
+                # if username is original insert user to finance.db else show error
                 try:
-                    result = c.execute("INSERT INTO users(username, hash) VALUES(:username, :hash)", [username, hashed])
-                    c.commit()
+                    c.execute("INSERT INTO users(username, hash) VALUES(:username, :hash)", [username, hashed])
+                    db.commit()
                 except sqlite3.IntegrityError:
                     return apology("Error", "Username taken")
             else:
                 return apology("Passwords don't match")
-        return render_template("login.html")
-    # return apology("TODO")
 
 @app.route("/sell", methods=["GET", "POST"])
 @login_required
