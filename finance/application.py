@@ -137,14 +137,14 @@ def quote():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     """Register user."""
-
+    username = request.form.get("username")
+    password = request.form.get("password")
+    password_confirm = request.form.get("password-confirm")
     # if get request return register template
     if request.method == "GET":
         return render_template("register.html")
-
     # if post request
     elif request.method == "POST":
-
         # check fields for completion
         if not request.form.get("username"):
             return apology("Error","Forgot Username")
@@ -152,20 +152,13 @@ def register():
             return apology("Error", "Forgot Password")
         elif not request.form.get("password-confirm"):
             return apology("Error", "Forgot Confirmation")
-        # TODO consider rejecting non alpha numeric symbols
-        # remove non alpha numberic symbols
-        username = re.sub(r'\W+', '', request.form.get("username").lower())
-        password = request.form.get("password")
-        password_confirm = request.form.get("password-confirm")
 
         # if passwords match
         if password == password_confirm:
             # encrypt password
             hashed = sha256_crypt.encrypt(password)
-
-            # if username is original
+            username = re.sub(r'\W+', '', username.lower())
             try:
-
                 # send user details to database
                 c.execute("INSERT INTO users(username, hash) VALUES(:username, :hash)", [username, hashed])
                 db.commit()
