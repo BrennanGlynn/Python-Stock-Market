@@ -24,6 +24,11 @@
     color: #2e944b;
 }
 
+h2
+{
+    color: #537fbe;
+}
+
 main .form-control
 {
     /* center form controls */

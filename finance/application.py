@@ -37,12 +37,35 @@ c = db.cursor()
 @app.route("/")
 @login_required
 def index():
+    current_user = session["user_id"]
+    c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user])
+    current_cash = c.fetchall()[0][0]
     return apology("TODO")
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
 def buy():
     """Buy shares of stock."""
+    current_user = session["user_id"]
+    current_cash = c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user]).fetchall()[0][0]
+    stock_symbol = request.form.get("stock-symbol")
+    stock_quantity = request.form.get("stock-quantity")
+
+    if request.method == "GET":
+        return render_template("buy.html")
+    elif request.method == "POST":
+        if not stock_symbol:
+            return apology("ERROR", "FORGOT STOCK SYMBOL")
+        elif not stock_quantity:
+            return apology("ERROR", "FORGOT DESIRED QUANTITY")
+        if lookup(stock_symbol)["price"] * int(stock_quantity) <= current_cash:
+            print("Transaction is possible")
+            # print("Sending transaction to database")
+            # c.execute("INSERT INTO transactions(user, symbol, price, quantity, transaction_date)"
+            #           "VALUES(:user, :symbol, :price, :quantity, :transaction_date)",
+            #           current_user, )
+        else:
+            return apology("ERROR", "INSUFFICIENT FUNDS")
     return apology("TODO")
 
 @app.route("/history")
@@ -148,9 +171,7 @@ def register():
                 db.commit()
 
                 # immediately log user in
-                c.execute("SELECT * FROM users WHERE username = :username", [username])
-                user = c.fetchall()
-                session["user_id"] = user[0][0]
+                session["user_id"] = c.execute("SELECT * FROM users WHERE username = :username", [username]).fetchall()[0][0]
 
                 # send user to index
                 return redirect(url_for("index"))
