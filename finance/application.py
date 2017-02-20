@@ -1,5 +1,6 @@
 import sqlite3
 import re
+import time
 
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_session import Session
@@ -46,24 +47,34 @@ def index():
 @login_required
 def buy():
     """Buy shares of stock."""
-    current_user = session["user_id"]
-    current_cash = c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user]).fetchall()[0][0]
-    stock_symbol = request.form.get("stock-symbol")
-    stock_quantity = request.form.get("stock-quantity")
-
     if request.method == "GET":
         return render_template("buy.html")
     elif request.method == "POST":
+        current_user = session["user_id"]
+        current_cash = c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user]).fetchall()[0][0]
+        stock_symbol = request.form.get("stock-symbol")
+        stock_quantity = request.form.get("stock-quantity")
+        now = time.strftime("%c")
+
         if not stock_symbol:
             return apology("ERROR", "FORGOT STOCK SYMBOL")
         elif not stock_quantity:
             return apology("ERROR", "FORGOT DESIRED QUANTITY")
-        if lookup(stock_symbol)["price"] * int(stock_quantity) <= current_cash:
+
+        stock_info = lookup(stock_symbol)
+        transaction_cost = stock_info["price"] * int(stock_quantity)
+        if transaction_cost <= current_cash:
             print("Transaction is possible")
-            # print("Sending transaction to database")
-            # c.execute("INSERT INTO transactions(user, symbol, price, quantity, transaction_date)"
-            #           "VALUES(:user, :symbol, :price, :quantity, :transaction_date)",
-            #           current_user, )
+            print("Subtracting cash from account")
+            current_cash -= transaction_cost
+            c.execute("UPDATE users SET cash = :cash WHERE id = :id", [current_cash, current_user])
+            print("Cash subtracted")
+            print("Sending transaction to database...")
+            c.execute("INSERT INTO transactions(user_id, symbol, price, quantity, transaction_date)"
+                      "VALUES(:user_id, :symbol, :price, :quantity, :transaction_date)",
+                      [current_user, stock_info["symbol"], stock_info["price"], stock_quantity, now])
+            db.commit()
+            print("Transaction sent.")
         else:
             return apology("ERROR", "INSUFFICIENT FUNDS")
     return apology("TODO")
