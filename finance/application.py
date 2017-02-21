@@ -53,7 +53,10 @@ def buy():
         current_user = session["user_id"]
         current_cash = c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user]).fetchall()[0][0]
         stock_symbol = request.form.get("stock-symbol")
-        stock_quantity = request.form.get("stock-quantity")
+        try:
+            stock_quantity = int(request.form.get("stock-quantity"))
+        except ValueError:
+            return apology("ERROR", "ENTER QUANTITY IN WHOLE NUMBERS ONLY")
         now = time.strftime("%c")
 
         if not stock_symbol:
@@ -62,7 +65,9 @@ def buy():
             return apology("ERROR", "FORGOT DESIRED QUANTITY")
 
         stock_info = lookup(stock_symbol)
-        transaction_cost = stock_info["price"] * int(stock_quantity)
+        if not stock_info:
+            return apology("ERROR", "INVALID STOCK")
+        transaction_cost = stock_info["price"] * stock_quantity
         if transaction_cost <= current_cash:
             print("Transaction is possible")
             print("Subtracting cash from account")
@@ -141,9 +146,9 @@ def quote():
         if not request.form.get("stock-symbol"):
             return apology("Error", "Forgot to enter a stock")
         stock = lookup(request.form.get("stock-symbol"))
+        if not stock:
+            return apology("ERROR", "INVALID STOCK")
         return render_template("quoted.html", stock=stock)
-    else:
-        return apology("TODO")
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
