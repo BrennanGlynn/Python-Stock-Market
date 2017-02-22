@@ -39,25 +39,26 @@ c = db.cursor()
 @login_required
 def index():
     current_user = session["user_id"]
-    c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user])
-    current_cash = c.fetchall()[0][0]
-    return apology("TODO")
+    current_cash = c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user]).fetchall()[0][0]
+    available = c.execute("SELECT symbol, sum(quantity) FROM transactions WHERE user_id = :user_id GROUP BY symbol",
+                          [session["user_id"]]).fetchall()
+    return render_template("index.html", current_cash=current_cash, available=available, lookup=lookup, usd=usd)
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
 def buy():
+    current_user = session["user_id"]
+    current_cash = c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user]).fetchall()[0][0]
     """Buy shares of stock."""
     if request.method == "GET":
-        return render_template("buy.html")
+        return render_template("buy.html", current_cash=usd(current_cash))
     elif request.method == "POST":
-        current_user = session["user_id"]
-        current_cash = c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user]).fetchall()[0][0]
+        now = time.strftime("%c")
         stock_symbol = request.form.get("stock-symbol")
         try:
             stock_quantity = int(request.form.get("stock-quantity"))
         except ValueError:
             return apology("ERROR", "ENTER QUANTITY IN WHOLE NUMBERS ONLY")
-        now = time.strftime("%c")
 
         if not stock_symbol:
             return apology("ERROR", "FORGOT STOCK SYMBOL")
@@ -69,12 +70,8 @@ def buy():
             return apology("ERROR", "INVALID STOCK")
         transaction_cost = stock_info["price"] * stock_quantity
         if transaction_cost <= current_cash:
-            print("Transaction is possible")
-            print("Subtracting cash from account")
             current_cash -= transaction_cost
             c.execute("UPDATE users SET cash = :cash WHERE id = :id", [current_cash, current_user])
-            print("Cash subtracted")
-            print("Sending transaction to database...")
             c.execute("INSERT INTO transactions(user_id, symbol, price, quantity, transaction_date)"
                       "VALUES(:user_id, :symbol, :price, :quantity, :transaction_date)",
                       [current_user, stock_info["symbol"], stock_info["price"], stock_quantity, now])
@@ -82,7 +79,7 @@ def buy():
             print("Transaction sent.")
         else:
             return apology("ERROR", "INSUFFICIENT FUNDS")
-    return apology("TODO")
+        return redirect(url_for("index"))
 
 @app.route("/history")
 @login_required
@@ -90,7 +87,7 @@ def history():
     """Show history of transactions."""
     current_user = session["user_id"]
     transactions = c.execute("SELECT * FROM transactions WHERE user_id = :user_id", [current_user]).fetchall()
-    return render_template("history.html", transactions=transactions, lookup=lookup)
+    return render_template("history.html", transactions=transactions, lookup=lookup, usd=usd)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -197,7 +194,42 @@ def register():
 @login_required
 def sell():
     """Sell shares of stock."""
-    return apology("TODO")
+    if request.method == "GET":
+        available = c.execute("SELECT symbol, sum(quantity) FROM transactions WHERE user_id = :user_id GROUP BY symbol", [session["user_id"]]).fetchall()
+        return render_template("sell.html")
+    elif request.method == "POST":
+        now = time.strftime("%c")
+        current_user = session["user_id"]
+        stock_symbol = request.form.get("stock-symbol")
+        current_cash = c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user]).fetchall()[0][0]
+        stock_available = c.execute(
+            "SELECT sum(quantity) FROM transactions WHERE user_id = :user_id AND symbol = :symbol",
+            [current_user, stock_symbol]).fetchall()
+        try:
+            stock_quantity = int(request.form.get("stock-quantity"))
+        except ValueError:
+            return apology("ERROR", "ENTER QUANTITY IN WHOLE NUMBERS ONLY")
+
+        if not stock_symbol:
+            return apology("ERROR", "Missing stock symbol")
+        if not stock_available[0][0]:
+            return apology("ERROR", "You don't own this security")
+
+        if stock_quantity <= stock_available[0][0]:
+            print("transaction possible")
+            stock_info = lookup(stock_symbol)
+            if not stock_info:
+                return apology("ERROR", "INVALID STOCK")
+            current_cash += stock_info["price"] * stock_quantity
+            c.execute("UPDATE users SET cash = :cash WHERE id = :id", [current_cash, current_user])
+            c.execute("INSERT INTO transactions(user_id, symbol, price, quantity, transaction_date)"
+                      "VALUES(:user_id, :symbol, :price, :quantity, :transaction_date)",
+                      [current_user, stock_info["symbol"], stock_info["price"], 0 - stock_quantity, now])
+            db.commit()
+            print("Transaction sent.")
+        else:
+            return apology("ERROR", "You don't own that much!")
+        return redirect(url_for("index"))
 
 if __name__ == "__main__":
     app.run(debug=True)
