@@ -88,7 +88,9 @@ def buy():
 @login_required
 def history():
     """Show history of transactions."""
-    return apology("TODO")
+    current_user = session["user_id"]
+    transactions = c.execute("SELECT * FROM transactions WHERE user_id = :user_id", [current_user]).fetchall()
+    return render_template("history.html", transactions=transactions, lookup=lookup)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
