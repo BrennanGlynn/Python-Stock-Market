@@ -42,7 +42,12 @@ def index():
     current_cash = c.execute("SELECT cash FROM users WHERE id = :CURRENT_USER", [current_user]).fetchall()[0][0]
     available = c.execute("SELECT symbol, sum(quantity) FROM transactions WHERE user_id = :user_id GROUP BY symbol",
                           [session["user_id"]]).fetchall()
-    return render_template("index.html", current_cash=current_cash, available=available, lookup=lookup, usd=usd)
+    stocks_value = 0
+    for stock in available:
+        stocks_value += (stock[1] * lookup(stock[0])["price"])
+    c.execute("UPDATE users SET assets = :assets WHERE id = :user_id", [stocks_value, current_user])
+    db.commit()
+    return render_template("index.html", current_cash=current_cash, available=available, lookup=lookup, usd=usd, stocks_value=stocks_value)
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
@@ -88,6 +93,12 @@ def history():
     current_user = session["user_id"]
     transactions = c.execute("SELECT * FROM transactions WHERE user_id = :user_id", [current_user]).fetchall()
     return render_template("history.html", transactions=transactions, lookup=lookup, usd=usd)
+
+@app.route("/leaderboard")
+@login_required
+def leaderboard():
+    leaders = c.execute("SELECT id, cash, assets FROM users ORDER BY cash + assets DESC").fetchall()
+    return render_template("leaderboard.html", leaders=leaders, usd=usd)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():

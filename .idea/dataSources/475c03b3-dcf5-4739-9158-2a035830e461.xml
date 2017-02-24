@@ -65,15 +65,21 @@
     </column>
     <column id="18" parent="5" name="cash">
       <Position>3</Position>
-      <DataType>NUMERIC(0,-1)|6</DataType>
+      <DataType>REAL(0,-1)|6</DataType>
       <NotNull>1</NotNull>
       <DefaultExpression>10000.00</DefaultExpression>
     </column>
-    <index id="19" parent="5" name="username">
+    <column id="19" parent="5" name="assets">
+      <Position>4</Position>
+      <DataType>DECIMAL(0,-1)|6</DataType>
+      <NotNull>1</NotNull>
+      <DefaultExpression>0</DefaultExpression>
+    </column>
+    <index id="20" parent="5" name="username">
       <ColNames>username</ColNames>
       <Unique>1</Unique>
     </index>
-    <key id="20" parent="5">
+    <key id="21" parent="5">
       <ColNames>id</ColNames>
       <Primary>1</Primary>
     </key>
