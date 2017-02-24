@@ -97,7 +97,7 @@ def history():
 @app.route("/leaderboard")
 @login_required
 def leaderboard():
-    leaders = c.execute("SELECT id, cash, assets FROM users ORDER BY cash + assets DESC").fetchall()
+    leaders = c.execute("SELECT username, cash, assets FROM users ORDER BY cash + assets DESC").fetchall()
     return render_template("leaderboard.html", leaders=leaders, usd=usd)
 
 @app.route("/login", methods=["GET", "POST"])
