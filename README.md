@@ -1,4 +1,4 @@
-# pset7
+# Python Stock Market
 Stock Market Game
 
 Web application that can register users.
